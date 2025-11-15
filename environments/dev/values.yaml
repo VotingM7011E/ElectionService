@@ -18,8 +18,8 @@ message: "Hello from Development Environment!"
 
 # Container image
 image:
-  repository: nginx
-  tag: alpine
+  repository: ghcr.io/votingm7011e/electionservice
+  tag: main
 
 # Ingress configuration
 ingress:

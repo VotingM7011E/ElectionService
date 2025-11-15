@@ -19,8 +19,8 @@ message: "Hello from Staging Environment - Pre-Production Testing"
 
 # Container image
 image:
-  repository: nginx
-  tag: alpine
+  repository: ghcr.io/votingm7011e/electionservice
+  tag: main
 
 # Ingress configuration
 ingress:
