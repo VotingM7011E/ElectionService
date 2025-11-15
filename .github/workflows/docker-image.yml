@@ -58,7 +58,11 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
       
-      - name: Trigger ArgoCD Sync
-        run: |
-          argocd login argocd.ltu-m7011e-2.se --username admin --password ${{ secrets.ARGOCD_PASSWORD }} --insecure;
-          argocd app sync election-service-dev
+      - uses: actions/checkout@v2
+      - name: Sync dev application on ArgoCD
+        uses: omegion/argocd-actions@v1
+        with:
+          address: "argocd.ltu-m7011e-2.se"
+          token: ${{ secrets.ARGOCD_TOKEN }}
+          action: sync
+          appName: "election-service-dev"
