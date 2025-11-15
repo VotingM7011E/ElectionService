@@ -15,10 +15,10 @@ spec:
         app: {{ .Values.app.name }}
     spec:
       containers:
-      - name: nginx
+      - name: app
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         ports:
-        - containerPort: 8000
+        - containerPort: 80
           name: http
         resources:
           requests:
