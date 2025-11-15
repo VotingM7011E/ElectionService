@@ -2,7 +2,7 @@
 
 app:
   name: election-service
-  replicas: 2
+  replicas: 1
 
 # Development domain - change to your assigned domain
 domain: election-service-dev.ltu-m7011e-2.se

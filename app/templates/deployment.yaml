@@ -18,7 +18,7 @@ spec:
       - name: nginx
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         ports:
-        - containerPort: 80
+        - containerPort: 8000
           name: http
         resources:
           requests:
@@ -27,10 +27,3 @@ spec:
           limits:
             cpu: 200m
             memory: 128Mi
-        volumeMounts:
-        - name: html
-          mountPath: /usr/share/nginx/html
-      volumes:
-      - name: html
-        configMap:
-          name: {{ .Values.app.name }}-html

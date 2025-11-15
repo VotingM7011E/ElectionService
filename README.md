@@ -1,6 +1,20 @@
 # ElectionService
 
-To get ci/cd running: 
+# Running
+Create virtual environment:  
+`python -m venv .venv`
+
+Don't forget to active the environment every time you develop:  
+`. .venv/bin/activate`
+
+Install dependencies:  
+`pip install -r app/requirements.txt`
+
+To run locally:  
+`flask --app app/src/app.py run`
+
+# ArgoCD things
+To get cd running: 
 
 ```sh
 # dev environment
