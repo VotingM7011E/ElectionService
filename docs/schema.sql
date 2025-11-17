@@ -1,10 +1,22 @@
 
-CREATE TABLE position (
+-- Table: positions
+CREATE TABLE positions (
     position_id     SERIAL PRIMARY KEY,
     meeting_id      INT NOT NULL,
     position_name   VARCHAR(255) NOT NULL,
-    description     TEXT,
-    CONSTRAINT fk_position_meeting
-        FOREIGN KEY (meeting_id) REFERENCES meeting(meeting_id)
-        ON DELETE CASCADE
+    is_open         BOOLEAN NOT NULL DEFAULT TRUE,
+);
+
+-- Table: nominations
+CREATE TABLE nominations (
+    position_id     INT NOT NULL,
+    username        VARCHAR(255) NOT NULL,
+    accepted        BOOLEAN NOT NULL DEFAULT FALSE,
+
+    PRIMARY KEY (position_id, username),
+
+    CONSTRAINT fk_nominations_positions
+        FOREIGN KEY (position_id)
+            REFERENCES positions(position_id)
+            ON DELETE CASCADE
 );
