@@ -1,4 +1,4 @@
-openapi: 3.0.4
+openapi: 3.1.1
 info:
   title: ElectionService API
   description: API for managing elected positions and user nominations.
@@ -8,7 +8,6 @@ servers:
   - url: http://api.example.com/v1
 
 paths:
-
   /positions:
     post:
       summary: Create a new position that users can be nominated to.
