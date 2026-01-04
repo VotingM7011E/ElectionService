@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 import random
 import requests
 import os
+import uuid
 from sqlalchemy import create_engine, MetaData
 
 app = Flask(__name__)
@@ -71,6 +72,53 @@ def get_meeting_id(meeting_code):
     except requests.exceptions.RequestException as e:
         # Step 7d: Catch-all for any other request-related errors
         print(f"Error fetching meeting_id: {e}")
+        return None
+
+def create_poll_in_voting_service(meeting_id, position_name, accepted_candidates):
+    """
+    Create a poll in the voting service for the accepted candidates.
+    Returns the poll_id (UUID) if successful, None otherwise.
+    """
+    # Generate a unique poll_id
+    poll_id = str(uuid.uuid4())
+    
+    # Build the voting service URL
+    base_url = "http://voting-service.voting-service-dev.svc.cluster.local"
+    endpoint = "/polls/"
+    full_url = base_url + endpoint
+    
+    # Prepare the poll data
+    poll_data = {
+        "vote": {
+            "meeting_id": meeting_id,
+            "poll_id": poll_id,
+            "pollType": "single",  # Single choice voting for elections
+            "options": accepted_candidates
+        }
+    }
+    
+    try:
+        # Make POST request to voting service
+        response = requests.post(full_url, json=poll_data, timeout=5)
+        response.raise_for_status()
+        
+        print(f"Successfully created poll {poll_id} for position '{position_name}'")
+        return poll_id
+        
+    except requests.exceptions.Timeout:
+        print(f"Timeout: voting-service did not respond within 5 seconds")
+        return None
+        
+    except requests.exceptions.ConnectionError:
+        print(f"Connection error: Could not reach voting-service")
+        return None
+        
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP error from voting-service: {e.response.status_code} - {e}")
+        return None
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error creating poll in voting-service: {e}")
         return None
 
 #--------------------
@@ -146,7 +194,8 @@ def get_positions():
                 "position_id": row.position_id,
                 "meeting_id": row.meeting_id,
                 "position_name": row.position_name,
-                "is_open": row.is_open
+                "is_open": row.is_open,
+                "poll_id": row.poll_id if hasattr(row, 'poll_id') else None
             }
             for row in rows
         ]
@@ -157,21 +206,58 @@ def get_positions():
 def close_position(position_id):
     """
     POST /positions/{position_id}/close
-    Close a position.
+    Close a position for nominations and create a poll in voting service.
     """
-    # UPDATE the existing position to set is_open = False
     with engine.connect() as conn:
+        # First, fetch the position to get its details
+        select_position_stmt = positions_table.select().where(
+            positions_table.c.position_id == position_id
+        )
+        position = conn.execute(select_position_stmt).fetchone()
+        
+        if position is None:
+            return jsonify({"error": "Could not find position with the provided id"}), 404
+        
+        if not position.is_open:
+            return jsonify({"error": "Position is already closed"}), 400
+        
+        # Get all accepted nominations for this position
+        select_nominations_stmt = nominations_table.select().where(
+            (nominations_table.c.position_id == position_id) &
+            (nominations_table.c.accepted == True)
+        )
+        accepted_nominations = conn.execute(select_nominations_stmt).fetchall()
+        
+        # Check if there are at least 2 accepted candidates
+        if len(accepted_nominations) < 2:
+            return jsonify({
+                "error": "Cannot close position with fewer than 2 accepted candidates. Need at least 2 candidates to create a poll."
+            }), 400
+        
+        # Extract candidate usernames
+        accepted_candidates = [nom.username for nom in accepted_nominations]
+        
+        # Create poll in voting service
+        poll_id = create_poll_in_voting_service(
+            meeting_id=position.meeting_id,
+            position_name=position.position_name,
+            accepted_candidates=accepted_candidates
+        )
+        
+        if poll_id is None:
+            return jsonify({
+                "error": "Failed to create poll in voting service. Position not closed."
+            }), 500
+        
+        # UPDATE the position to set is_open = False and store poll_id
         update_stmt = positions_table.update().where(
             positions_table.c.position_id == position_id
         ).values(
-            is_open=False
+            is_open=False,
+            poll_id=poll_id
         )
-        result = conn.execute(update_stmt)
+        conn.execute(update_stmt)
         conn.commit()
-        
-        # Check if position was found and updated
-        if result.rowcount == 0:
-            return jsonify({"error": "Could not find position with the provided id"}), 404
         
         # Fetch the updated position to return it
         select_stmt = positions_table.select().where(
@@ -183,7 +269,9 @@ def close_position(position_id):
             "position_id": row.position_id,
             "meeting_id": row.meeting_id,
             "position_name": row.position_name,
-            "is_open": row.is_open
+            "is_open": row.is_open,
+            "poll_id": poll_id,
+            "candidates": accepted_candidates
         }
 
     return jsonify(closed_position), 200
