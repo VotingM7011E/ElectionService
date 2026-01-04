@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, MetaData
 app = Flask(__name__)
 
 # Database connection setup
-app.config["DATABASE_URL"] = os.getenv("DATABASE_URL")
+app.config["DATABASE_URL"] = os.getenv("DATABASE_URI")
 if not app.config["DATABASE_URL"]:
     raise RuntimeError("DATABASE_URL not set")
 
