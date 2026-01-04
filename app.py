@@ -21,58 +21,8 @@ positions_table = metadata.tables['positions']
 nominations_table = metadata.tables['nominations']
 
 @app.route("/")
-def hello_world():
-    return "<p>Hello, World! This is the newest version!</p>"
-
-        
-def get_meeting_id(meeting_code):
-    """Fetch meeting ID from meeting service using the meeting code"""
-    # Step 1: Build the full DNS URL to the meeting-service in another namespace
-    # Format: http://<service-name>.<namespace>.svc.cluster.local/<endpoint>
-    base_url = "http://meeting-service.meeting-service-dev.svc.cluster.local"
-    endpoint = f"/code/{meeting_code}"
-    full_url = base_url + endpoint
-    
-    try:
-        # Step 2: Make an HTTP GET request to the meeting-service API
-        # timeout=5 means wait max 5 seconds for a response
-        response = requests.get(full_url, timeout=5)
-        
-        # Step 3: Check if the request was successful (status code 200-299)
-        # Raises an HTTPError if status code indicates failure (4xx or 5xx)
-        response.raise_for_status()
-        
-        # Step 4: Parse the JSON response from the meeting-service
-        # Assumes the response looks like: {"meeting_id": 123, "meeting_code": "ABC123", ...}
-        meeting_data = response.json()
-        
-        # Step 5: Extract the meeting_id from the response data
-        # Use .get() to safely access the key (returns None if key doesn't exist)
-        meeting_id = meeting_data.get('meeting_id')
-        
-        # Step 6: Return the meeting_id to the caller
-        return meeting_id
-        
-    except requests.exceptions.Timeout:
-        # Step 7a: Handle case where the request takes too long
-        print(f"Timeout: meeting-service did not respond within 5 seconds")
-        return None
-        
-    except requests.exceptions.ConnectionError:
-        # Step 7b: Handle case where we can't reach the meeting-service
-        # This could mean DNS failed, service is down, or network issue
-        print(f"Connection error: Could not reach meeting-service")
-        return None
-        
-    except requests.exceptions.HTTPError as e:
-        # Step 7c: Handle HTTP errors (404 Not Found, 500 Internal Server Error, etc.)
-        print(f"HTTP error: {e.response.status_code} - {e}")
-        return None
-        
-    except requests.exceptions.RequestException as e:
-        # Step 7d: Catch-all for any other request-related errors
-        print(f"Error fetching meeting_id: {e}")
-        return None
+def root():
+    return "ElectionService API running"
 
 def create_poll_in_voting_service(meeting_id, position_name, accepted_candidates):
     """
@@ -131,7 +81,7 @@ def create_position():
     POST /positions
     Create a new position.
     Request body: {
-        "meeting_code": "ABC123",
+        "meeting_id": 123,
         "position_name": "President"
     }
     """
@@ -139,19 +89,12 @@ def create_position():
     data = request.get_json()
     
     # Extract meeting_code and position_name from request
-    meeting_code = data.get('meeting_code')
+    meeting_id = data.get('meeting_id')
     position_name = data.get('position_name')
-    
+
     # Validate required fields
-    if not meeting_code or not position_name:
-        return jsonify({"error": "meeting_code and position_name are required"}), 400
-    
-    # Fetch the meeting_id from meeting-service using the meeting_code
-    meeting_id = get_meeting_id(meeting_code)
-    
-    # Check if meeting_id was successfully retrieved
-    if meeting_id is None:
-        return jsonify({"error": "Could not find meeting with the provided code"}), 404
+    if meeting_id is None or not position_name:
+        return jsonify({"error": "meeting_id and position_name are required"}), 400
     
     # Insert into PostgreSQL database
     with engine.connect() as conn:
