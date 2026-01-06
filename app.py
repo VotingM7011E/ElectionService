@@ -36,7 +36,7 @@ def create_poll_in_voting_service(meeting_id, position_name, accepted_candidates
     
     # Prepare the poll data
     vote_data = {
-        "meeting_id": meeting_id,
+        "meeting_id": str(meeting_id),  # Convert UUID to string for JSON serialization
         "poll_id": poll_id,
         "pollType": "single",  # Single choice voting for elections
         "options": accepted_candidates
