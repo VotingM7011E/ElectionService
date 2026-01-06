@@ -4,6 +4,7 @@ import requests
 import os
 import uuid
 from sqlalchemy import create_engine, MetaData
+from mq import publish_event
 
 app = Flask(__name__)
 
@@ -77,48 +78,34 @@ def get_meeting_id(meeting_code):
 def create_poll_in_voting_service(meeting_id, position_name, accepted_candidates):
     """
     Create a poll in the voting service for the accepted candidates.
+    Uses RabbitMQ message queue to send the poll creation request.
     Returns the poll_id (UUID) if successful, None otherwise.
     """
     # Generate a unique poll_id
     poll_id = str(uuid.uuid4())
     
-    # Build the voting service URL
-    base_url = "http://voting-service.voting-service-dev.svc.cluster.local"
-    endpoint = "/polls/"
-    full_url = base_url + endpoint
-    
     # Prepare the poll data
-    poll_data = {
-        "vote": {
-            "meeting_id": meeting_id,
-            "poll_id": poll_id,
-            "pollType": "single",  # Single choice voting for elections
-            "options": accepted_candidates
-        }
+    vote_data = {
+        "meeting_id": meeting_id,
+        "poll_id": poll_id,
+        "pollType": "single",  # Single choice voting for elections
+        "options": accepted_candidates
     }
     
     try:
-        # Make POST request to voting service
-        response = requests.post(full_url, json=poll_data, timeout=5)
-        response.raise_for_status()
+        # Publish event to RabbitMQ for voting service to consume
+        publish_event(
+            routing_key="voting.create",
+            data={"vote": vote_data}
+        )
         
-        print(f"Successfully created poll {poll_id} for position '{position_name}'")
+        print(f"Successfully published voting.create event for poll {poll_id} for position '{position_name}'")
         return poll_id
         
-    except requests.exceptions.Timeout:
-        print(f"Timeout: voting-service did not respond within 5 seconds")
-        return None
-        
-    except requests.exceptions.ConnectionError:
-        print(f"Connection error: Could not reach voting-service")
-        return None
-        
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP error from voting-service: {e.response.status_code} - {e}")
-        return None
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error creating poll in voting-service: {e}")
+    except Exception as e:
+        print(f"Error publishing poll creation event: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 #--------------------
