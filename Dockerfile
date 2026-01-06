@@ -1,12 +1,25 @@
-FROM python:3.13.7-alpine
+# Use official Python runtime as base image
+FROM python:3.11-slim
 
+# Set working directory in container
 WORKDIR /app
 
-COPY ./app/requirements.txt /app
+# Copy requirements file
+COPY requirements.txt .
+
+# Install Python dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install -r requirements.txt
 
-COPY ./app/src /app
+# Copy application code
+COPY . .
 
-ENTRYPOINT ["python3"]
-CMD ["app.py"]
+# Expose port 80
+EXPOSE 80
+
+# Environment variables
+ENV FLASK_APP=app.py
+ENV PYTHONUNBUFFERED=1
+
+# Run the application
+CMD ["python", "app.py"]

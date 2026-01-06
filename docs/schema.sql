@@ -2,7 +2,7 @@
 -- Table: positions
 CREATE TABLE positions (
     position_id     SERIAL PRIMARY KEY,
-    meeting_id      INT NOT NULL,
+    meeting_id      UUID NOT NULL,
     position_name   VARCHAR(255) NOT NULL,
     is_open         BOOLEAN NOT NULL DEFAULT TRUE,
 );
