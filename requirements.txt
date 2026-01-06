@@ -3,3 +3,7 @@ requests
 sqlalchemy
 psycopg2-binary
 pika
+flask-socketio
+gevent
+gevent-websocket
+redis

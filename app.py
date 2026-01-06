@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all()  # Enables websocket to handle multiple connections effectively
+
 from flask import Flask, jsonify, request
 import random
 import requests
@@ -5,6 +8,7 @@ import os
 import uuid
 from sqlalchemy import create_engine, MetaData
 from mq import publish_event
+from flask_socketio import SocketIO, join_room, leave_room, emit
 
 app = Flask(__name__)
 
@@ -20,6 +24,41 @@ metadata.reflect(bind=engine)  # Auto-load existing tables from database
 # Get the positions table and nominations table
 positions_table = metadata.tables['positions']
 nominations_table = metadata.tables['nominations']
+
+# Initialize SocketIO
+socketio = SocketIO(app, cors_allowed_origins="*",
+                    message_queue=os.getenv("REDIS_URL", None),
+                    async_mode='gevent')
+
+# ---------------------------
+# SocketIO Events
+# ---------------------------
+
+@socketio.on('connect')
+def on_connect():
+    print("Client connected to ElectionService")
+
+@socketio.on('disconnect')
+def on_disconnect():
+    print("Client disconnected from ElectionService")
+
+@socketio.on('join_election')
+def on_join_election(data):
+    meeting_id = data.get('meeting_id')
+    if meeting_id:
+        join_room(meeting_id)
+        print(f"Client joined election room: {meeting_id}")
+
+@socketio.on('leave_election')
+def on_leave_election(data):
+    meeting_id = data.get('meeting_id')
+    if meeting_id:
+        leave_room(meeting_id)
+        print(f"Client left election room: {meeting_id}")
+
+# ---------------------------
+# API Routes
+# ---------------------------
 
 @app.route("/")
 def root():
@@ -105,6 +144,12 @@ def create_position():
         "position_name": position_name,
         "is_open": True 
     }
+
+    # Emit WebSocket event to notify clients
+    socketio.emit('position_created', {
+        "meeting_id": meeting_id,
+        "position": created_position
+    }, room=meeting_id)
 
     return jsonify(created_position), 201
 
@@ -216,6 +261,12 @@ def close_position(position_id):
             "candidates": accepted_candidates
         }
 
+    # Emit WebSocket event to notify clients that position is closed and voting started
+    socketio.emit('position_closed', {
+        "meeting_id": closed_position["meeting_id"],
+        "position": closed_position
+    }, room=closed_position["meeting_id"])
+
     return jsonify(closed_position), 200
 
 @app.route("/positions/<int:position_id>/nominations", methods=["POST"])
@@ -259,11 +310,23 @@ def nominate_candidate(position_id):
             # Handle duplicate nomination (same user, same position)
             return jsonify({"error": "Nomination already exists for this user and position"}), 409
 
+        # Get position details for WebSocket event
+        position_stmt = positions_table.select().where(positions_table.c.position_id == position_id)
+        position = conn.execute(position_stmt).fetchone()
+
     nomination = {
         "position_id": position_id,
         "username": username, 
         "accepted": False
     }
+
+    # Emit WebSocket event to notify clients of new nomination
+    if position:
+        socketio.emit('nomination_added', {
+            "meeting_id": position.meeting_id,
+            "position_id": position_id,
+            "nomination": nomination
+        }, room=position.meeting_id)
 
     return jsonify(nomination), 201
 
@@ -338,14 +401,26 @@ def accept_nomination(position_id, candidate_name):
         if result.rowcount == 0:
             return jsonify({"error": "Could not find nomination for this candidate and position"}), 404
 
+        # Get position details for WebSocket event
+        position_stmt = positions_table.select().where(positions_table.c.position_id == position_id)
+        position = conn.execute(position_stmt).fetchone()
+
     accepted_nomination = {
         "position_id": position_id,
         "candidate_name": candidate_name,
         "is_accepted": True
     }
 
+    # Emit WebSocket event to notify clients of accepted nomination
+    if position:
+        socketio.emit('nomination_accepted', {
+            "meeting_id": position.meeting_id,
+            "position_id": position_id,
+            "candidate_name": candidate_name
+        }, room=position.meeting_id)
+
     return jsonify(accepted_nomination), 200
 
 
 if __name__ == '__main__':
-	app.run(host='0.0.0.0', port=80)
+	socketio.run(app, host='0.0.0.0', port=80)
