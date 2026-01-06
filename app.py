@@ -147,9 +147,9 @@ def create_position():
 
     # Emit WebSocket event to notify clients
     socketio.emit('position_created', {
-        "meeting_id": meeting_id,
+        "meeting_id": str(meeting_id),
         "position": created_position
-    }, room=meeting_id)
+    }, room=str(meeting_id))
 
     return jsonify(created_position), 201
 
@@ -263,9 +263,9 @@ def close_position(position_id):
 
     # Emit WebSocket event to notify clients that position is closed and voting started
     socketio.emit('position_closed', {
-        "meeting_id": closed_position["meeting_id"],
+        "meeting_id": str(closed_position["meeting_id"]),
         "position": closed_position
-    }, room=closed_position["meeting_id"])
+    }, room=str(closed_position["meeting_id"]))
 
     return jsonify(closed_position), 200
 
@@ -323,10 +323,10 @@ def nominate_candidate(position_id):
     # Emit WebSocket event to notify clients of new nomination
     if position:
         socketio.emit('nomination_added', {
-            "meeting_id": position.meeting_id,
+            "meeting_id": str(position.meeting_id),
             "position_id": position_id,
             "nomination": nomination
-        }, room=position.meeting_id)
+        }, room=str(position.meeting_id))
 
     return jsonify(nomination), 201
 
@@ -414,10 +414,10 @@ def accept_nomination(position_id, candidate_name):
     # Emit WebSocket event to notify clients of accepted nomination
     if position:
         socketio.emit('nomination_accepted', {
-            "meeting_id": position.meeting_id,
+            "meeting_id": str(position.meeting_id),
             "position_id": position_id,
             "candidate_name": candidate_name
-        }, room=position.meeting_id)
+        }, room=str(position.meeting_id))
 
     return jsonify(accepted_nomination), 200
 
