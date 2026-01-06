@@ -69,15 +69,17 @@ def create_position():
     Create a new position.
     Request body: {
         "meeting_id": 123,
-        "position_name": "President"
+        "position_name": "President",
+        "agenda_item_id": "optional-id-to-link-to-agenda-item"
     }
     """
     # Get data from the request body
     data = request.get_json()
     
-    # Extract meeting_code and position_name from request
+    # Extract meeting_id, position_name, and optional agenda_item_id
     meeting_id = data.get('meeting_id')
     position_name = data.get('position_name')
+    agenda_item_id = data.get('agenda_item_id')  # Optional: link to specific agenda item
 
     # Validate required fields
     if meeting_id is None or not position_name:
@@ -87,6 +89,7 @@ def create_position():
     with engine.connect() as conn:
         insert_stmt = positions_table.insert().values(
             meeting_id=meeting_id,
+            agenda_item_id=agenda_item_id,
             position_name=position_name,
             is_open=True
         )
@@ -108,21 +111,30 @@ def create_position():
 @app.route("/positions", methods=["GET"])
 def get_positions():
     """
-    GET /positions
-    Retrieve all open positions.
+    GET /positions?meeting_id={uuid}&agenda_item_id={id}
+    Retrieve positions. Can filter by meeting_id and/or agenda_item_id.
     """
+    meeting_id = request.args.get('meeting_id')
+    agenda_item_id = request.args.get('agenda_item_id')
+    
     with engine.connect() as conn:
-        # Fetch ALL open positions
-        select_stmt = positions_table.select().where(
-            positions_table.c.is_open == True
-        )
+        # Build query with optional filters
+        select_stmt = positions_table.select()
+        
+        if meeting_id:
+            select_stmt = select_stmt.where(positions_table.c.meeting_id == meeting_id)
+        
+        if agenda_item_id:
+            select_stmt = select_stmt.where(positions_table.c.agenda_item_id == agenda_item_id)
+        
         rows = conn.execute(select_stmt).fetchall()
         
         # Convert rows to list of dictionaries
-        open_positions = [
+        positions_list = [
             {
                 "position_id": row.position_id,
                 "meeting_id": row.meeting_id,
+                "agenda_item_id": row.agenda_item_id if hasattr(row, 'agenda_item_id') else None,
                 "position_name": row.position_name,
                 "is_open": row.is_open,
                 "poll_id": row.poll_id if hasattr(row, 'poll_id') else None
@@ -130,7 +142,7 @@ def get_positions():
             for row in rows
         ]
 
-    return jsonify(open_positions), 200
+    return jsonify(positions_list), 200
 
 @app.route("/positions/<int:position_id>/close", methods=["POST"])
 def close_position(position_id):
