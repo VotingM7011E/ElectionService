@@ -254,18 +254,18 @@ def close_position(position_id):
         
         closed_position = {
             "position_id": row.position_id,
-            "meeting_id": row.meeting_id,
+            "meeting_id": str(row.meeting_id),
             "position_name": row.position_name,
             "is_open": row.is_open,
-            "poll_id": poll_id,
+            "poll_id": str(poll_id),
             "candidates": accepted_candidates
         }
 
     # Emit WebSocket event to notify clients that position is closed and voting started
     socketio.emit('position_closed', {
-        "meeting_id": str(closed_position["meeting_id"]),
+        "meeting_id": closed_position["meeting_id"],
         "position": closed_position
-    }, room=str(closed_position["meeting_id"]))
+    }, room=closed_position["meeting_id"])
 
     return jsonify(closed_position), 200
 
